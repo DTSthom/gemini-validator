@@ -202,6 +202,92 @@ gemini-validate optimize "Please carefully review this code and tell me if there
 - Information preservation score
 - Token savings estimate
 
+### Multi-Perspective Analysis: 16 Personas
+
+The validator includes 16 specialized personas that analyze content from different angles. Each persona brings a unique lens to uncover insights others might miss.
+
+#### Core Validation Personas
+
+**`practical`** - Hands-on Practitioner
+- Focus: Immediate applicability, actionable insights
+- Question: "What can I implement TODAY?"
+- Best for: Feature requests, implementation decisions
+
+**`critical`** - Critical Analyst
+- Focus: Weaknesses, biases, gaps
+- Question: "What flaws, risks, or assumptions are hidden here?"
+- Best for: Risk assessment, quality control
+
+**`strategic`** - Strategic Thinker
+- Focus: Long-term implications, systems perspective
+- Question: "What are the 3-5 year consequences?"
+- Best for: Architecture decisions, roadmap planning
+
+**`sonnet`** - Claude Sonnet 4.5 Optimizer
+- Focus: Prompt engineering, token efficiency
+- Question: "How can this be optimized for Sonnet 4.5?"
+- Best for: Prompt optimization, extended thinking validation
+
+#### Domain Expert Personas
+
+**`security`** - Security Professional
+- Focus: Vulnerabilities, threats, exploits
+- Question: "How can this be exploited? What could go wrong?"
+- Best for: Code review, system hardening
+
+**`educational`** - Educational Expert
+- Focus: Knowledge transfer, learning structure
+- Question: "What can I LEARN from this?"
+- Best for: Documentation, tutorials, teaching materials
+
+**`scientific`** - Research Scientist
+- Focus: Evidence, methodology, empirical validation
+- Question: "What's the science? Are claims valid?"
+- Best for: Fact-checking, research validation
+
+**`philosophical`** - Philosophical Thinker
+- Focus: Ethics, deeper meanings, values
+- Question: "What does this mean for humanity and society?"
+- Best for: Ethical considerations, value alignment
+
+**`economic`** - Economic Analyst
+- Focus: Financial dynamics, business models, incentives
+- Question: "What are the economic implications?"
+- Best for: Business decisions, monetization strategies
+
+**`social`** - Sociologist
+- Focus: Community dynamics, relationships, social structures
+- Question: "How does this affect relationships and communities?"
+- Best for: User experience, community building
+
+**`historical`** - Historian
+- Focus: Patterns, precedents, context
+- Question: "Has this been tried before? What can history teach us?"
+- Best for: Avoiding past mistakes, learning from precedent
+
+#### Usage
+
+**Single persona analysis**:
+```bash
+gemini-validate practical "Should we use microservices or monolith?"
+gemini-validate security "$(cat auth_system.py)"
+gemini-validate economic "New pricing model: $10/month unlimited vs $1/feature"
+```
+
+**Multi-perspective (via interactive mode)**:
+```bash
+gemini
+🗿 gemini (flash) ❯ all Should we build this feature?
+# Analyzes from all 16 perspectives
+```
+
+**View persona prompts**:
+```bash
+gemini
+🗿 gemini (flash) ❯ persona critical
+# Shows the exact prompt template for critical persona
+```
+
 ## Real-World Usage Examples
 
 ### Example 1: Secure System Update Script
