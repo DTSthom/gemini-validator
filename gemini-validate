@@ -1,0 +1,695 @@
+#!/usr/bin/env python3
+"""
+Gemini Validation Tool - Specialized validation requests
+Part of the Creator/Validator Architecture
+"""
+
+import os
+import sys
+import json
+import urllib.request
+import urllib.error
+from datetime import datetime
+from pathlib import Path
+
+# SECURITY FIX: No hardcoded API key
+API_KEY = os.environ.get('GOOGLE_API_KEY')
+if not API_KEY:
+    print("❌ Error: GOOGLE_API_KEY environment variable not set", file=sys.stderr)
+    print("Set your API key: export GOOGLE_API_KEY='your-key-here'", file=sys.stderr)
+    sys.exit(1)
+
+VALIDATION_LOG = Path.home() / '.gemini_validations.json'
+
+VALIDATION_PROMPTS = {
+    'fact': """You are a fact-checking validator. Verify the following claim:
+
+**Claim:** {content}
+**Source:** {source}
+**Context:** {context}
+
+Respond with:
+1. VERDICT: TRUE/FALSE/PARTIALLY TRUE
+2. CONFIDENCE: 0-100%
+3. EXPLANATION: Brief explanation
+4. CORRECTION: If false, provide correct information with source""",
+
+    'code': """You are a senior security engineer. Review this code:
+
+```{language}
+{content}
+```
+
+**Purpose:** {context}
+**Dependencies:** {dependencies}
+
+Check for:
+1. Security vulnerabilities (injection, XSS, etc.)
+2. Performance issues
+3. Best practice violations
+
+Respond with:
+- SECURITY RATING: SAFE/WARNING/CRITICAL
+- ISSUES FOUND: List any problems
+- FIXES REQUIRED: Specific remediation steps""",
+
+    'logic': """You are a logic validator. Analyze this reasoning chain:
+
+{content}
+
+**Context:** {context}
+
+Evaluate:
+1. Logical soundness
+2. Hidden assumptions
+3. Potential fallacies
+
+Respond with:
+- VALIDITY: SOUND/FLAWED/QUESTIONABLE
+- ISSUES: Any logical problems
+- SUGGESTIONS: How to strengthen the argument""",
+
+    'ambiguity': """You are a consensus resolver. Help choose between options:
+
+{content}
+
+**Context:** {context}
+**Constraints:** {constraints}
+
+Analyze:
+1. Pros and cons of each option
+2. Most likely successful outcome
+3. Risk assessment
+
+Respond with:
+- RECOMMENDATION: Which option and why
+- CONFIDENCE: How certain (0-100%)
+- RISKS: Key risks to consider""",
+
+    'optimize': """You are an efficiency optimizer. This prompt generated good output:
+
+**Original Prompt:**
+{content}
+
+**Output Generated:**
+{output}
+
+Create a shorter, more efficient prompt that would generate similar quality output.
+Goal: Reduce tokens by at least 20% while maintaining quality.
+
+Respond with:
+- OPTIMIZED PROMPT: The improved version
+- TOKEN REDUCTION: Estimated percentage saved
+- QUALITY IMPACT: Any tradeoffs""",
+
+    'practical': """<role>Hands-on practitioner, 10+ years field experience. Values immediate applicability over theory.</role>
+
+<task>Extract actionable insights - what can be implemented TODAY.</task>
+
+<hint>Skip abstract theory unless it translates to practice. Be specific. Lens: 'What can I do right now?'</hint>
+
+<requirements>
+1. Immediate Actions - Concrete steps (today)
+2. Specific Techniques - Named methods mentioned
+3. Real Examples - Practical scenarios
+4. Tools - Specific resources mentioned
+</requirements>
+
+<content>
+{content}
+</content>
+
+<output_format>
+IMMEDIATE ACTIONS:
+- [specific actions]
+
+TECHNIQUES:
+- [named methods]
+
+EXAMPLES:
+- [practical scenarios]
+
+TOOLS:
+- [specific resources]
+</output_format>""",
+
+    'critical': """<role>Critical analyst. Identifies weaknesses, biases, gaps. Asks hard questions.</role>
+
+<task>Uncover flaws, biases, risks others miss.</task>
+
+<hint>Skeptical but fair. Question assumptions. Lens: 'What could go wrong? What's hidden?'</hint>
+
+<requirements>
+1. Logical Flaws - Fallacies, unsupported claims
+2. Biases - Conflicts of interest, selective evidence
+3. Missing Factors - Ignored considerations
+4. Risks - What could go wrong
+5. Evidence Quality - Data vs anecdotes
+</requirements>
+
+<content>
+{content}
+</content>
+
+<output_format>
+FLAWS:
+- [logical problems]
+
+BIASES:
+- [potential biases]
+
+MISSING:
+- [overlooked factors]
+
+RISKS:
+- [potential problems]
+
+EVIDENCE:
+- [quality assessment]
+</output_format>""",
+
+    'strategic': """<role>Strategic thinker. Long-term focus, systems perspective, pattern recognition across domains.</role>
+
+<task>Analyze long-term/systemic implications (3-5 year projection).</task>
+
+<hint>Think beyond immediate effects. Consider scale, larger trends, opportunity costs. Lens: 'Where does this lead? Bigger picture?'</hint>
+
+<requirements>
+1. Long-term - What happens at scale over time
+2. Broader Context - Industry/societal trends
+3. Second-order - Indirect consequences
+4. Opportunity Costs - What we're NOT doing
+5. Strategic Value - Lasting vs temporary
+</requirements>
+
+<content>
+{content}
+</content>
+
+<output_format>
+LONG-TERM:
+- [what happens over time]
+
+CONTEXT:
+- [larger trends]
+
+SECOND-ORDER:
+- [indirect consequences]
+
+OPPORTUNITY COSTS:
+- [NOT doing]
+
+STRATEGIC VALUE:
+- [lasting vs temporary]""",
+
+    'security': """You are a security professional trained to identify risks, threats, and vulnerabilities. You think like an attacker while defending like an engineer. Your lens: 'How can this be exploited? What could go wrong?'
+
+When analyzing content, assess:
+1. **Security Risks**: Authentication, authorization, data protection issues
+2. **Attack Vectors**: How could a malicious actor exploit this?
+3. **Privacy Concerns**: What personal/sensitive data is at risk?
+4. **Compliance Issues**: Regulatory or policy violations
+5. **Safety Implications**: Physical or operational safety concerns
+
+For technical content: focus on code vulnerabilities, infrastructure risks, configuration issues
+For non-technical content: focus on process risks, information disclosure, social engineering
+
+Content to analyze:
+{content}
+
+Provide your security analysis in this format:
+SECURITY RISKS:
+- [list security issues]
+
+ATTACK VECTORS:
+- [how could this be exploited]
+
+PRIVACY:
+- [data protection concerns]
+
+COMPLIANCE:
+- [regulatory issues]
+
+SAFETY:
+- [physical/operational risks]""",
+
+    'educational': """You are an educational expert focused on knowledge transfer and skill development. You value clear explanations, structured learning, and actionable knowledge. Your lens: 'What can I LEARN from this?'
+
+When analyzing content, extract:
+1. **Core Concepts**: Key ideas and principles being taught
+2. **Learning Resources**: Books, courses, tools, or references mentioned
+3. **Skill Progression**: How to develop this skill from beginner to advanced
+4. **Prerequisites**: What you need to know before starting
+5. **Practice Methods**: How to apply and reinforce this knowledge
+
+Focus on extractable knowledge, not just information. Identify the teaching moments.
+
+Content to analyze:
+{content}
+
+Provide your educational analysis in this format:
+CORE CONCEPTS:
+- [key ideas explained]
+
+LEARNING RESOURCES:
+- [books, courses, tools mentioned]
+
+SKILL PROGRESSION:
+- [beginner → advanced path]
+
+PREREQUISITES:
+- [required knowledge/skills]
+
+PRACTICE METHODS:
+- [how to apply this]""",
+
+    'philosophical': """You are a philosophical thinker examining deeper meanings, ethics, and implications. You question assumptions and explore underlying values. Your lens: 'What does this mean for humanity, society, and ethics?'
+
+When analyzing content, consider:
+1. **Underlying Assumptions**: What beliefs or worldviews are taken for granted?
+2. **Ethical Considerations**: What moral questions arise from this?
+3. **Cultural Implications**: How does this reflect or shape cultural values?
+4. **Human Psychology**: What does this reveal about human nature?
+5. **Values**: What principles are being promoted or challenged?
+
+Look beyond the surface. Connect to larger philosophical themes.
+
+Content to analyze:
+{content}
+
+Provide your philosophical analysis in this format:
+UNDERLYING ASSUMPTIONS:
+- [unstated beliefs]
+
+ETHICAL CONSIDERATIONS:
+- [moral questions raised]
+
+CULTURAL IMPLICATIONS:
+- [societal values reflected]
+
+HUMAN PSYCHOLOGY:
+- [insights about human nature]
+
+VALUES:
+- [principles promoted/challenged]""",
+
+    'economic': """You are an economic analyst focused on financial dynamics, business models, and market forces. You understand incentives and follow the money. Your lens: 'What are the economic implications and incentives?'
+
+When analyzing content, assess:
+1. **Business Models**: How is money made? What's being monetized?
+2. **ROI Calculations**: What are the costs vs. benefits mentioned?
+3. **Market Opportunities**: What business opportunities exist here?
+4. **Economic Incentives**: What motivates the actors involved?
+5. **Cost/Benefit**: What are the financial trade-offs?
+
+Think like an investor. Follow the money trail and identify economic forces.
+
+Content to analyze:
+{content}
+
+Provide your economic analysis in this format:
+BUSINESS MODELS:
+- [how money is made]
+
+ROI CALCULATIONS:
+- [costs vs benefits]
+
+MARKET OPPORTUNITIES:
+- [business potential]
+
+ECONOMIC INCENTIVES:
+- [what motivates actors]
+
+COST/BENEFIT:
+- [financial trade-offs]""",
+
+    'social': """You are a sociologist analyzing community dynamics, relationships, and social structures. You understand how people connect and collaborate. Your lens: 'How does this affect relationships and communities?'
+
+When analyzing content, examine:
+1. **Social Dynamics**: Power structures, group behaviors, social norms
+2. **Collaboration Opportunities**: How people can work together
+3. **Networking Implications**: Relationship building and connections
+4. **Community Building**: How to foster strong communities
+5. **Relationship Impact**: Effects on personal and professional relationships
+
+Focus on human connections and social systems.
+
+Content to analyze:
+{content}
+
+Provide your social analysis in this format:
+SOCIAL DYNAMICS:
+- [group behaviors, power structures]
+
+COLLABORATION OPPORTUNITIES:
+- [ways to work together]
+
+NETWORKING IMPLICATIONS:
+- [relationship building]
+
+COMMUNITY BUILDING:
+- [fostering communities]
+
+RELATIONSHIP IMPACT:
+- [effects on relationships]""",
+
+    'historical': """You are a historian examining patterns, precedents, and context. You understand that history often repeats itself. Your lens: 'Has this been tried before? What can we learn from history?'
+
+When analyzing content, investigate:
+1. **Historical Parallels**: Similar ideas, movements, or technologies from the past
+2. **Past Successes/Failures**: What worked or didn't work before
+3. **Evolution of Ideas**: How this concept developed over time
+4. **Lessons from History**: What patterns can inform current decisions
+5. **Cyclical Patterns**: Recurring themes across different eras
+
+Those who don't learn from history are doomed to repeat it. Find the patterns.
+
+Content to analyze:
+{content}
+
+Provide your historical analysis in this format:
+HISTORICAL PARALLELS:
+- [similar past events/ideas]
+
+PAST SUCCESSES/FAILURES:
+- [what worked or didn't]
+
+EVOLUTION OF IDEAS:
+- [how concept developed]
+
+LESSONS FROM HISTORY:
+- [applicable patterns]
+
+CYCLICAL PATTERNS:
+- [recurring themes]""",
+
+    'scientific': """You are a scientist focused on evidence, methodology, and empirical validation. You demand rigor and scrutinize claims. Your lens: 'What's the science? Are the claims valid?'
+
+When analyzing content, evaluate:
+1. **Research Citations**: What studies or papers are referenced?
+2. **Study Quality**: Are the studies well-designed and peer-reviewed?
+3. **Statistical Claims**: Are numbers and statistics used correctly?
+4. **Mechanism Explanations**: Do the scientific explanations make sense?
+5. **Scientific Consensus**: Does this align with mainstream science or is it fringe?
+
+Extraordinary claims require extraordinary evidence. Evaluate the science critically.
+
+Content to analyze:
+{content}
+
+Provide your scientific analysis in this format:
+RESEARCH CITATIONS:
+- [studies mentioned]
+
+STUDY QUALITY:
+- [methodology assessment]
+
+STATISTICAL CLAIMS:
+- [validity of numbers]
+
+MECHANISM EXPLANATIONS:
+- [scientific accuracy]
+
+SCIENTIFIC CONSENSUS:
+- [mainstream vs fringe]""",
+
+    'sonnet': """<role>You are Claude Sonnet 4.5 prompt engineering validator using extended thinking mode. You understand token efficiency and multi-perspective analysis patterns.</role>
+
+<task>Analyze this prompt/task for Sonnet 4.5 optimization opportunities using YouTube-validated prompt engineering principles.</task>
+
+<context>
+**Sonnet 4.5 Capabilities**:
+- Extended thinking mode (visible reasoning steps)
+- 200K token context window
+- 30-hour autonomous operation
+- 77.2% SWE-bench coding ability
+
+**When to Use Extended Thinking** (YouTube validated):
+✅ Multi-factor decision analysis (AI detection, quality scoring)
+✅ Semantic understanding (topic clustering, entity relationships)
+✅ Explainable decisions (reasoning transparency)
+❌ Simple data extraction (use grep/jq instead)
+❌ Performance-critical ops (native tools faster)
+❌ High-volume batch (cost scales linearly)
+
+**Token Efficiency Patterns** (YouTube learnings):
+- Role definitions: <role>...</role>
+- Task clarity: <task>...</task>
+- Context injection: <context>...</context>
+- Output structure: <output_format>...</output_format>
+- Hint patterns: <hint>Your lens: 'question'</hint>
+</context>
+
+<requirements>
+1. **Extended Thinking Assessment**: Should this use extended thinking? Why/why not?
+2. **Token Optimization**: Identify verbose patterns, suggest compression
+3. **Structure Analysis**: Is prompt well-structured with tags?
+4. **Multi-perspective Check**: Would multi-perspective help? (practical/critical/strategic)
+5. **Native Tools First**: Can grep/jq/bash do this faster?
+</requirements>
+
+<content>
+{content}
+</content>
+
+<output_format>
+EXTENDED THINKING:
+- [Should use? Why/why not? Token budget estimate]
+
+TOKEN EFFICIENCY:
+- [Current issues, optimization suggestions, estimated savings]
+
+STRUCTURE QUALITY:
+- [Tag usage, clarity, improvements]
+
+MULTI-PERSPECTIVE:
+- [Would perspectives help? Which ones? Why?]
+
+NATIVE TOOLS:
+- [Can bash/grep/jq solve this faster? How?]
+
+OPTIMIZED PROMPT:
+- [Rewritten version with improvements]
+</output_format>"""
+}
+
+def call_gemini(prompt, max_tokens=2000, max_retries=3):
+    """Make API call to Gemini with retry logic and better error handling"""
+    import time
+
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}'
+
+    data = {
+        'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
+        'generationConfig': {
+            'temperature': 0.3,  # Lower temperature for validation
+            'maxOutputTokens': max_tokens  # Configurable token limit
+        }
+    }
+
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(data).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+
+            response = urllib.request.urlopen(req, timeout=30)
+            result = json.loads(response.read().decode('utf-8'))
+
+            # Validate API response structure
+            if 'candidates' not in result:
+                return "Error: No candidates in API response"
+
+            if not result['candidates']:
+                return "Error: Empty candidates list - content may have been filtered"
+
+            candidate = result['candidates'][0]
+            if 'content' not in candidate:
+                return "Error: Missing content in candidate"
+
+            if 'parts' not in candidate['content']:
+                return "Error: Missing parts in content"
+
+            if not candidate['content']['parts']:
+                return "Error: Empty parts list"
+
+            if 'text' not in candidate['content']['parts'][0]:
+                return "Error: Missing text in response part"
+
+            return candidate['content']['parts'][0]['text']
+
+        except urllib.error.HTTPError as e:
+            error_msg = f"API HTTP Error {e.code}: {e.reason}"
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                print(f"⚠️  {error_msg}, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            return error_msg
+
+        except urllib.error.URLError as e:
+            error_msg = f"Network Error: {e.reason}"
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt
+                print(f"⚠️  {error_msg}, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+                continue
+            return error_msg
+
+        except json.JSONDecodeError as e:
+            return f"Invalid API Response (JSON parse error): {e}"
+
+        except Exception as e:
+            return f"Unexpected Error: {type(e).__name__}: {e}"
+
+    return "Error: Max retries exceeded"
+
+def validate(validation_type, content, **kwargs):
+    """Perform validation with input validation and configurable token limits"""
+
+    # Input validation
+    MAX_CONTENT_LENGTH = 50000  # ~10k tokens
+    if len(content) > MAX_CONTENT_LENGTH:
+        return f"Error: Content too long ({len(content)} chars, max {MAX_CONTENT_LENGTH})"
+
+    if not content.strip():
+        return "Error: Empty content provided"
+
+    # Build the prompt
+    template = VALIDATION_PROMPTS.get(validation_type)
+    if not template:
+        return f"Unknown validation type: {validation_type}"
+
+    # Sanitize content to prevent prompt injection
+    # Escape curly braces that could interfere with .format()
+    content_safe = content.replace('{', '{{').replace('}', '}}')
+
+    # Fill in the template
+    try:
+        prompt = template.format(
+            content=content_safe,
+            source=kwargs.get('source', 'Not provided'),
+            context=kwargs.get('context', 'Not provided'),
+            language=kwargs.get('language', 'python'),
+            dependencies=kwargs.get('dependencies', 'None specified'),
+            constraints=kwargs.get('constraints', 'None specified'),
+            output=kwargs.get('output', 'Not provided')
+        )
+    except KeyError as e:
+        return f"Error: Invalid template variable: {e}"
+
+    # Perspective validations need more tokens for detailed analysis
+    perspective_types = ['practical', 'critical', 'strategic', 'security', 'educational', 'philosophical', 'economic', 'social', 'historical', 'scientific', 'sonnet']
+    max_tokens = 2000 if validation_type in perspective_types else 800
+
+    # Make the API call
+    print(f"🔍 Validating ({validation_type})...")
+    response = call_gemini(prompt, max_tokens=max_tokens)
+
+    # Log the validation
+    log_validation(validation_type, content, response)
+
+    return response
+
+def log_validation(val_type, content, response):
+    """Log validation for metrics"""
+    logs = []
+    if VALIDATION_LOG.exists():
+        with open(VALIDATION_LOG) as f:
+            logs = json.load(f)
+
+    logs.append({
+        'timestamp': datetime.now().isoformat(),
+        'type': val_type,
+        'content_preview': content[:100] if len(content) > 100 else content,
+        'response_preview': response[:200] if len(response) > 200 else response
+    })
+
+    # Keep only last 100 validations
+    logs = logs[-100:]
+
+    # SECURITY FIX: Write with secure file permissions
+    import stat
+    with open(VALIDATION_LOG, 'w') as f:
+        json.dump(logs, f, indent=2)
+    os.chmod(VALIDATION_LOG, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+
+def show_stats():
+    """Show validation statistics"""
+    if not VALIDATION_LOG.exists():
+        print("No validations logged yet")
+        return
+
+    with open(VALIDATION_LOG) as f:
+        logs = json.load(f)
+
+    print(f"📊 Validation Statistics")
+    print(f"Total validations: {len(logs)}")
+
+    # Count by type
+    types = {}
+    for log in logs:
+        types[log['type']] = types.get(log['type'], 0) + 1
+
+    print("\nBy type:")
+    for t, count in sorted(types.items()):
+        print(f"  {t}: {count}")
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Gemini Validation Tool')
+    parser.add_argument('type', choices=['fact', 'code', 'logic', 'ambiguity', 'optimize', 'practical', 'critical', 'strategic', 'security', 'educational', 'philosophical', 'economic', 'social', 'historical', 'scientific', 'sonnet', 'stats'],
+                       help='Type of validation')
+    parser.add_argument('content', nargs='*', help='Content to validate')
+    parser.add_argument('-s', '--source', help='Source URL or reference')
+    parser.add_argument('-c', '--context', help='Additional context')
+    parser.add_argument('-l', '--language', default='python', help='Programming language (for code)')
+    parser.add_argument('-d', '--dependencies', help='Code dependencies')
+    parser.add_argument('--constraints', help='Constraints (for ambiguity)')
+    parser.add_argument('-o', '--output', help='Generated output (for optimize)')
+
+    args = parser.parse_args()
+
+    if args.type == 'stats':
+        show_stats()
+        return
+
+    if not args.content:
+        # Read from stdin if no content provided
+        print("Reading from stdin (Ctrl+D when done)...")
+        content = sys.stdin.read()
+    else:
+        content = ' '.join(args.content)
+
+    print(f"🤖 Gemini Validation: {args.type.upper()}")
+    print("=" * 50)
+
+    response = validate(
+        args.type,
+        content,
+        source=args.source,
+        context=args.context,
+        language=args.language,
+        dependencies=args.dependencies,
+        constraints=args.constraints,
+        output=args.output
+    )
+
+    print(response)
+    print("=" * 50)
+
+    # Show verdict prominently for fact checks
+    if args.type == 'fact' and 'VERDICT:' in response:
+        verdict_line = [l for l in response.split('\n') if 'VERDICT:' in l][0]
+        if 'TRUE' in verdict_line:
+            print("✅ Fact verified as TRUE")
+        elif 'FALSE' in verdict_line:
+            print("❌ Fact determined as FALSE")
+        else:
+            print("⚠️  Partially true or uncertain")
+
+if __name__ == '__main__':
+    main()

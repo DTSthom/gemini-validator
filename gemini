@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""
+Quick Gemini CLI - Chat with Gemini from terminal
+Usage:
+  gemini "Your question here"
+  gemini -m flash "Fast response"
+  gemini -m pro "More capable response"
+  gemini -t 0.9 "Creative response"
+  gemini -c "Continue conversation"
+"""
+
+import os
+import sys
+import json
+import urllib.request
+import urllib.error
+from pathlib import Path
+
+# Configuration - SECURITY FIX: No hardcoded API key
+API_KEY = os.environ.get('GOOGLE_API_KEY')
+if not API_KEY:
+    print("❌ Error: GOOGLE_API_KEY environment variable not set", file=sys.stderr)
+    print("Set your API key: export GOOGLE_API_KEY='your-key-here'", file=sys.stderr)
+    sys.exit(1)
+
+HISTORY_FILE = Path.home() / '.gemini_history.json'
+
+MODELS = {
+    'flash': 'gemini-2.0-flash',
+    'lite': 'gemini-2.0-flash-lite',
+    'pro': 'gemini-2.5-pro',
+    '2.5': 'gemini-2.5-flash'
+}
+
+def load_history():
+    """Load conversation history"""
+    if HISTORY_FILE.exists():
+        with open(HISTORY_FILE) as f:
+            return json.load(f)
+    return []
+
+def save_history(history):
+    """Save conversation history with secure file permissions"""
+    # SECURITY FIX: Create file with restrictive permissions (600 = owner read/write only)
+    import stat
+
+    # Write history securely
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(history[-10:], f)
+
+    # Set restrictive permissions: owner read/write only
+    os.chmod(HISTORY_FILE, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+
+def sanitize_prompt(prompt):
+    """SECURITY FIX: Basic input validation"""
+    # Limit prompt length to prevent abuse
+    MAX_PROMPT_LENGTH = 10000
+    if len(prompt) > MAX_PROMPT_LENGTH:
+        raise ValueError(f"Prompt too long (max {MAX_PROMPT_LENGTH} characters)")
+
+    # Ensure prompt is string
+    if not isinstance(prompt, str):
+        raise TypeError("Prompt must be a string")
+
+    return prompt.strip()
+
+def call_gemini(prompt, model='flash', temperature=0.7, continue_chat=False):
+    """Call Gemini API with input sanitization"""
+    # SECURITY FIX: Sanitize user input
+    prompt = sanitize_prompt(prompt)
+
+    model_name = MODELS.get(model, model)
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}'
+
+    # Handle conversation history
+    if continue_chat:
+        history = load_history()
+        history.append({'role': 'user', 'parts': [{'text': prompt}]})
+        contents = history
+    else:
+        contents = [{'role': 'user', 'parts': [{'text': prompt}]}]
+        history = []
+
+    data = {
+        'contents': contents,
+        'generationConfig': {
+            'temperature': temperature,
+            'maxOutputTokens': 1000
+        }
+    }
+
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+
+        response = urllib.request.urlopen(req, timeout=30)
+        result = json.loads(response.read().decode('utf-8'))
+
+        if 'candidates' in result and result['candidates']:
+            text = result['candidates'][0]['content']['parts'][0]['text']
+
+            # Update history
+            if continue_chat:
+                history.append(result['candidates'][0]['content'])
+                save_history(history)
+            else:
+                save_history([
+                    {'role': 'user', 'parts': [{'text': prompt}]},
+                    result['candidates'][0]['content']
+                ])
+
+            return text
+        else:
+            return "No response generated"
+
+    except urllib.error.HTTPError as e:
+        error_body = json.loads(e.read().decode('utf-8'))
+        return f"Error: {error_body['error']['message']}"
+    except Exception as e:
+        return f"Error: {e}"
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Chat with Gemini')
+    parser.add_argument('prompt', nargs='*', help='Your prompt')
+    parser.add_argument('-m', '--model', default='flash', choices=list(MODELS.keys()),
+                       help='Model to use (default: flash)')
+    parser.add_argument('-t', '--temperature', type=float, default=0.7,
+                       help='Temperature (0.0-1.0, default: 0.7)')
+    parser.add_argument('-c', '--continue', dest='continue_chat', action='store_true',
+                       help='Continue previous conversation')
+    parser.add_argument('--clear', action='store_true',
+                       help='Clear conversation history')
+
+    args = parser.parse_args()
+
+    if args.clear:
+        if HISTORY_FILE.exists():
+            HISTORY_FILE.unlink()
+            print("✅ Conversation history cleared")
+        return
+
+    if not args.prompt:
+        print("Usage: gemini 'Your question here'")
+        print("       gemini -m pro 'Use Pro model'")
+        print("       gemini -c 'Continue conversation'")
+        print("       gemini --clear  # Clear history")
+        return
+
+    prompt = ' '.join(args.prompt)
+
+    print(f"🤖 Gemini {args.model.upper()}", end="")
+    if args.continue_chat:
+        print(" (continuing)", end="")
+    print("\n" + "=" * 50)
+
+    response = call_gemini(prompt, args.model, args.temperature, args.continue_chat)
+    print(response)
+
+    if 'Error' not in response:
+        print("\n" + "=" * 50)
+        print("💡 Use 'gemini -c \"follow up\"' to continue this conversation")
+
+if __name__ == '__main__':
+    main()

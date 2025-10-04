@@ -1,0 +1,388 @@
+# Gemini Validator
+
+**Creator/Validator Architecture** - Use Claude Code for creation, Gemini for validation
+
+Two-tool system for AI-assisted development with built-in validation:
+- `gemini` - Quick chat with Gemini FLASH/PRO
+- `gemini-validate` - Specialized validation (fact-checking, code security, logic analysis)
+
+## Philosophy
+
+**Problem**: AI models can hallucinate, make logical errors, or miss security flaws
+**Solution**: Use a second model as auditor to catch issues before they ship
+
+**Pattern**: Claude creates → Gemini validates → Ship with confidence
+
+## Installation
+
+```bash
+# Clone repository
+git clone https://github.com/YOUR_USERNAME/gemini-validator.git
+cd gemini-validator
+
+# Copy to PATH
+sudo cp gemini gemini-validate /usr/local/bin/
+chmod +x /usr/local/bin/gemini /usr/local/bin/gemini-validate
+
+# Set API key
+export GOOGLE_API_KEY="your-api-key-here"
+echo 'export GOOGLE_API_KEY="your-api-key"' >> ~/.bashrc
+```
+
+## Quick Start
+
+### Basic Chat
+
+```bash
+# Quick question
+gemini "Explain async/await in Python"
+
+# Creative response
+gemini -t 0.9 "Write a haiku about debugging"
+
+# Use Gemini PRO (more capable, slower)
+gemini -m pro "Complex architectural question"
+
+# Continue conversation
+gemini -c "Tell me more about that"
+```
+
+### Validation Commands
+
+```bash
+# Fact-checking
+gemini-validate fact "Python 3.12 was released in October 2023"
+
+# Code security review
+gemini-validate code "$(cat script.sh)"
+gemini-validate code "user_input = request.form['data']"
+
+# Logic analysis
+gemini-validate logic "If all developers use AI, and AI makes mistakes, then all code has bugs"
+
+# Resolve ambiguity
+gemini-validate ambiguity "Should I use REST or GraphQL for my API?"
+
+# Optimize prompts
+gemini-validate optimize "I need you to carefully analyze this data..."
+```
+
+## Validation Types
+
+### `fact` - Fact Checking
+Verifies specific claims, numbers, dates, and assertions.
+
+**Example**:
+```bash
+gemini-validate fact "whisper.cpp processes audio at 6.6x realtime"
+```
+
+**Output**:
+- ✅/⚠️/❌ Verdict
+- Confidence score (0-100%)
+- Evidence for/against claim
+- Alternative facts if claim is wrong
+
+### `code` - Security Review
+Checks code for vulnerabilities, security flaws, and best practice violations.
+
+**Example**:
+```bash
+gemini-validate code "$(cat vulnerable_script.sh)"
+```
+
+**Checks**:
+- Command injection risks
+- Input validation
+- Error handling
+- Authentication/authorization flaws
+- OWASP Top 10 vulnerabilities
+
+### `logic` - Logic Analysis
+Evaluates reasoning chains for logical consistency and fallacies.
+
+**Example**:
+```bash
+gemini-validate logic "Since Gemini validated this code, it must be perfect"
+```
+
+**Detects**:
+- Logical fallacies (appeal to authority, false dichotomy, etc.)
+- Invalid inferences
+- Hidden assumptions
+- Circular reasoning
+
+### `ambiguity` - Resolve Unclear Choices
+Helps make decisions when multiple valid options exist.
+
+**Example**:
+```bash
+gemini-validate ambiguity "Should I consolidate these 5 scripts or keep them separate?"
+```
+
+**Provides**:
+- Pros/cons of each option
+- Situational recommendations
+- Trade-off analysis
+
+### `optimize` - Prompt Optimization
+Reduces token usage while preserving information quality.
+
+**Example**:
+```bash
+gemini-validate optimize "Please carefully review this code and tell me if there are any issues..."
+```
+
+**Output**:
+- Compressed version (30-50% reduction)
+- Information preservation score
+- Token savings estimate
+
+## Real-World Usage Examples
+
+### Example 1: Secure System Update Script
+
+```bash
+# Claude creates update script
+cat > update.sh <<'EOF'
+#!/bin/bash
+packages=$(apt list --upgradable | cut -d'/' -f1)
+sudo apt upgrade -y $packages
+EOF
+
+# Gemini validates security
+gemini-validate code "$(cat update.sh)"
+```
+
+**Gemini Finds**: Command injection vulnerability in `$packages` expansion
+**Fix**: Use bash arrays instead of string concatenation
+
+### Example 2: Validate Performance Claims
+
+```bash
+# Claim from benchmarking
+gemini-validate fact "Our SOQM architecture achieved 230x efficiency improvement"
+```
+
+**Gemini Validates**: Requires baseline measurement evidence (11,500 tokens → 50 tokens)
+
+### Example 3: Architectural Decision
+
+```bash
+# Deciding on tool fragmentation
+gemini-validate ambiguity "Should Prommel integration be a separate tool or flag in existing tool?"
+```
+
+**Gemini Recommends**: Integration with flag (less fragmentation, shared config)
+
+### Example 4: Logic Check Before Shipping
+
+```bash
+# Validate reasoning in documentation
+gemini-validate logic "Extended thinking mode costs more tokens, therefore always disable it for efficiency"
+```
+
+**Gemini Detects**: False dichotomy - missing nuance about when extended thinking adds value
+
+## Integration with Claude Code
+
+Add to your `~/.claude/CLAUDE.md`:
+
+```markdown
+## 🔍 GEMINI VALIDATION PROTOCOL
+
+**Before implementing:**
+1. Facts/numbers → `gemini-validate fact`
+2. Executable code → `gemini-validate code`
+3. Multi-step reasoning → `gemini-validate logic`
+4. Unclear decisions → `gemini-validate ambiguity`
+
+**After complex tasks:**
+5. Prompt optimization → `gemini-validate optimize`
+```
+
+## Configuration
+
+### API Key
+
+Set your Google API key:
+```bash
+export GOOGLE_API_KEY="your-api-key-here"
+```
+
+Or add to `~/.bashrc`:
+```bash
+echo 'export GOOGLE_API_KEY="your-key"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Model Selection
+
+- **FLASH** (default): Fast responses, good for most tasks
+- **PRO**: More capable, slower, better for complex reasoning
+
+```bash
+gemini -m flash "Quick question"
+gemini -m pro "Complex architectural design"
+```
+
+### Temperature Control
+
+- **0.0**: Deterministic, factual
+- **0.7**: Balanced (default)
+- **0.9**: Creative, varied
+
+```bash
+gemini -t 0.0 "What is 2+2?"
+gemini -t 0.9 "Write creative code comments"
+```
+
+## Advanced Features
+
+### Conversation Continuity
+
+```bash
+gemini "Explain Docker containers"
+gemini -c "How does it compare to VMs?"
+gemini -c "Show me an example"
+```
+
+Conversation history stored in: `~/.gemini_conversation_history.json`
+
+### Validation Logging
+
+All validations logged to: `~/.gemini_validations.json`
+
+```bash
+# View recent validations
+cat ~/.gemini_validations.json | jq '.[-5:]'
+```
+
+### Batch Validation
+
+```bash
+# Validate multiple files
+for file in *.py; do
+    echo "Validating $file..."
+    gemini-validate code "$(cat "$file")"
+done
+```
+
+## Success Metrics
+
+**From monolith-updater project** (Oct 2025):
+- 🔴 **Before Gemini**: Security rating 4/10 - command injection, missing error handling
+- 🟢 **After Gemini**: Security rating 8/10 - 5 critical fixes applied
+- ✅ **Result**: Shellcheck clean, production-ready
+
+**16-Persona Validation**:
+- Caught command injection in package handling
+- Found insufficient error trapping
+- Identified missing lock file management
+- Flagged network retry gaps
+- Recommended non-interactive mode
+
+## Security Best Practices
+
+### Don't Trust, Verify
+
+```bash
+# ❌ Bad: Ship without validation
+claude "create update script" > update.sh && bash update.sh
+
+# ✅ Good: Validate before running
+claude "create update script" > update.sh
+gemini-validate code "$(cat update.sh)"
+# Review findings, apply fixes, then run
+```
+
+### Validate Claims with Evidence
+
+```bash
+# ❌ Bad: Accept performance claims
+"This approach is 10x faster" → Ship it
+
+# ✅ Good: Demand evidence
+gemini-validate fact "This approach is 10x faster"
+# Gemini: "No evidence provided, needs benchmarking"
+```
+
+### Check Logic Before Complex Decisions
+
+```bash
+# ❌ Bad: Make architectural decisions based on gut feeling
+"This needs a separate microservice" → Build it
+
+# ✅ Good: Validate reasoning
+gemini-validate logic "This feature needs a separate microservice because..."
+# Gemini: "Complexity not justified, integrate with flag instead"
+```
+
+## Troubleshooting
+
+### Command Not Found
+
+```bash
+which gemini gemini-validate
+# If empty, tools not in PATH
+sudo cp gemini gemini-validate /usr/local/bin/
+```
+
+### API Key Issues
+
+```bash
+echo $GOOGLE_API_KEY
+# If empty, key not set
+export GOOGLE_API_KEY="your-key"
+```
+
+### Rate Limiting
+
+Gemini API has rate limits. If you hit them:
+- Wait 60 seconds between validation requests
+- Use `-m flash` (faster, cheaper)
+- Batch validations off-peak hours
+
+## Anti-Theatre Protocol
+
+**Reality Check Before Validation**:
+
+1. **Evidence Required**: Don't validate claims without baseline measurements
+2. **Necessity Check**: Is validation actually needed or just theatre?
+3. **Action Focus**: Validation must lead to concrete action (fix/ship/reject)
+
+**Red Flags**:
+- ❌ Validating to delay shipping working code
+- ❌ Over-validating trivial decisions (analysis paralysis)
+- ❌ Validation without acting on results
+
+**Validation is valuable when**:
+- ✅ Shipping to production (security/correctness critical)
+- ✅ Making architectural decisions (costly to reverse)
+- ✅ Claims need evidence before sharing publicly
+
+## Contributing
+
+Found a bug or want to add a validation type? Open an issue or PR.
+
+**New validation types must include**:
+1. Clear use case and examples
+2. Output format specification
+3. Real-world validation proving value
+
+## License
+
+MIT License - See LICENSE file
+
+## Credits
+
+Built as part of the Monolith Protocol project, inspired by:
+- Anti-Theatre Protocol (evidence-based development)
+- Creator/Validator Architecture (dual-LLM validation)
+- SOQM Philosophy (query efficiency)
+
+---
+
+**Version**: 1.0.0
+**Last Updated**: October 2025
+**Status**: Production Ready ✅
