@@ -15,23 +15,85 @@ Two-tool system for AI-assisted development with built-in validation:
 
 ## Installation
 
+### One-Command Install (Recommended)
+
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/gemini-validator.git
+git clone https://github.com/DTSthom/gemini-validator.git
 cd gemini-validator
 
-# Copy to PATH
-sudo cp gemini gemini-validate /usr/local/bin/
-chmod +x /usr/local/bin/gemini /usr/local/bin/gemini-validate
+# Run installer (auto-detects sudo requirements)
+./install.sh
+```
 
-# Set API key
+The installer will:
+- ✅ Check Python 3 availability
+- ✅ Install `gemini` and `gemini-validate` to `/usr/local/bin`
+- ✅ Set executable permissions
+- ✅ Check for API key and provide setup instructions
+
+### API Key Setup
+
+**Get your API key**: https://aistudio.google.com/app/apikey
+
+```bash
+# Set for current session
 export GOOGLE_API_KEY="your-api-key-here"
-echo 'export GOOGLE_API_KEY="your-api-key"' >> ~/.bashrc
+
+# Make permanent (add to ~/.bashrc)
+echo 'export GOOGLE_API_KEY="your-api-key-here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Verify installation**:
+```bash
+gemini "Hello, are you working?"
+```
+
+### Manual Installation (Alternative)
+
+If you prefer manual setup:
+
+```bash
+sudo cp gemini gemini-validate /usr/local/bin/
+sudo chmod +x /usr/local/bin/gemini /usr/local/bin/gemini-validate
 ```
 
 ## Quick Start
 
-### Basic Chat
+### Interactive Mode (New!)
+
+Launch interactive mode with no arguments:
+
+```bash
+gemini
+```
+
+**Features**:
+- 🗿 Custom prompt showing current model
+- 🤖 Switch models on-the-fly: `flash`, `pro`, `lite`, `2.5`
+- 🎭 16-persona validation integrated
+- 📋 Run `all <content>` to analyze with all 16 personas
+- 🔍 View persona prompts: `persona <name>`
+- 📖 Full guide: `guide` or `help`
+- 🚪 Exit cleanly: `exit` or `quit`
+
+**Example session**:
+```
+🗿 gemini (flash) ❯ pro
+✅ Switched to PRO model
+
+🗿 gemini (pro) ❯ What is SOQM architecture?
+[Gemini PRO response...]
+
+🗿 gemini (pro) ❯ fact Python was released in 1991
+[Fact-checking validation...]
+
+🗿 gemini (pro) ❯ exit
+👋 Exiting Gemini Validator
+```
+
+### Basic Chat (CLI Mode)
 
 ```bash
 # Quick question
