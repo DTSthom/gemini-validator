@@ -6,6 +6,8 @@ Two-tool system for AI-assisted development with built-in validation:
 - `gemini` - Quick chat with Gemini FLASH/PRO
 - `gemini-validate` - Specialized validation (fact-checking, code security, logic analysis)
 
+**🚀 Claude Code Integration**: Enable automatic validation inside Claude sessions with **zero token usage** - see [CLAUDE_INTEGRATION.md](CLAUDE_INTEGRATION.md)
+
 ## Philosophy
 
 **Problem**: AI models can hallucinate, make logical errors, or miss security flaws
@@ -248,20 +250,98 @@ gemini-validate logic "Extended thinking mode costs more tokens, therefore alway
 
 ## Integration with Claude Code
 
-Add to your `~/.claude/CLAUDE.md`:
+### Zero-Token Validation Inside Claude Sessions
+
+**Problem**: Validating with Claude uses your Anthropic token budget
+**Solution**: Claude can run `gemini-validate` via Bash tool - uses Google API tokens instead
+
+> **📋 Quick Setup**: See [CLAUDE_INTEGRATION.md](CLAUDE_INTEGRATION.md) for a ready-to-copy template
+
+### Setup Instructions
+
+Add this to your `~/.claude/CLAUDE.md`:
 
 ```markdown
-## 🔍 GEMINI VALIDATION PROTOCOL
+## 🔍 GEMINI VALIDATION PROTOCOL (Creator/Validator Architecture)
+**Claude = Creator/Doer | Gemini = Auditor/Validator**
 
-**Before implementing:**
-1. Facts/numbers → `gemini-validate fact`
-2. Executable code → `gemini-validate code`
-3. Multi-step reasoning → `gemini-validate logic`
-4. Unclear decisions → `gemini-validate ambiguity`
+**🚀 ZERO TOKEN USAGE**: Claude uses Bash tool to run validations outside session
 
-**After complex tasks:**
-5. Prompt optimization → `gemini-validate optimize`
+## Quick Commands (Claude runs via Bash tool)
+- `gemini-validate fact "claim"` - Verify facts/numbers/dates
+- `gemini-validate code "$(cat file.py)"` - Security review code
+- `gemini-validate logic "reasoning"` - Check logic chains
+- `gemini-validate ambiguity "A vs B"` - Resolve unclear choices
+- `gemini-validate optimize "prompt"` - Reduce token usage
+
+**User can request**: "validate this with Gemini" or "run a security check"
+
+## Mandatory Validation Triggers (AUTOMATIC)
+**Claude MUST use Bash tool to validate BEFORE proceeding**:
+1. **Creating new scripts/tools** → `gemini-validate logic` (anti-fragmentation)
+2. **Adding >50 lines** → `gemini-validate code` (security check)
+3. **Architectural decisions** → `gemini-validate logic` (complexity audit)
+4. **Performance claims** → `gemini-validate fact` (verify benchmarks)
+5. **Multiple approaches** → `gemini-validate ambiguity` (choose best)
+
+**Example Automatic Validation**:
+```bash
+# User: "Create a new script for backups"
+# Claude detects: NEW TOOL trigger
+# Claude runs via Bash tool:
+gemini-validate logic "Should backup be separate tool or flag?
+Option A: New backup.sh (150 lines)
+Option B: Add --backup flag to existing tool (30 lines)"
+
+# Gemini: "QUESTIONABLE - Need evaluation criteria"
+# Claude: "Gemini suggests defining criteria before choosing approach"
 ```
+
+## Integration Points
+- Works with **Anti-Theatre Protocol**: Validates complexity before building
+- Enhances **Anti-Fragmentation**: Checks integration vs separation
+- Supports **Security-First**: Automatic code review before shipping
+```
+
+### Usage Patterns
+
+**Automatic (Claude-initiated)**:
+```
+You: "Create a new monitoring script"
+Claude: [Detects NEW TOOL trigger]
+Claude: [Runs gemini-validate logic via Bash tool]
+Claude: "Gemini suggests integrating into existing tool instead of separate script"
+```
+
+**Manual (User-requested)**:
+```
+You: "Validate this architecture with Gemini"
+Claude: [Runs gemini-validate logic with your design options]
+Claude: [Shows Gemini's verdict and recommendations]
+```
+
+**Direct (You run it)**:
+```bash
+gemini-validate code "$(cat my_script.sh)"
+```
+
+### Token Efficiency
+
+**Without Integration** (Claude validates internally):
+- Uses Claude's extended thinking: ~2000 tokens
+- Uses Anthropic API quota
+- Costs count toward your session budget
+
+**With Integration** (Claude runs gemini-validate):
+- Uses Bash tool: **0 Claude tokens**
+- Uses Google API: ~$0.0001 per validation
+- 2-3 second response time
+- No impact on Claude session budget
+
+**Example Savings**:
+- 10 validations in session
+- Without: 20,000 Claude tokens used
+- With: 0 Claude tokens, $0.001 Google API cost
 
 ## Configuration
 
