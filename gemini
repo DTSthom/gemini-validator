@@ -122,6 +122,158 @@ def call_gemini(prompt, model='flash', temperature=0.7, continue_chat=False):
     except Exception as e:
         return f"Error: {e}"
 
+def interactive_mode():
+    """Interactive mode with custom prompt and personality selection"""
+
+    # Monolith ASCII branding
+    print()
+    print("╔════════════════════════════════════════════════════╗")
+    print("║     🗿 MONOLITH GEMINI VALIDATOR                   ║")
+    print("║     Creator/Validator Architecture                ║")
+    print("╚════════════════════════════════════════════════════╝")
+    print()
+    print("🤖 Models (switch anytime):")
+    print("  flash, pro, lite, 2.5")
+    print()
+    print("🎭 16-Persona Validation:")
+    print()
+    print("  Core:        fact, code, logic, ambiguity, optimize")
+    print("  Analysis:    practical, critical, strategic, security")
+    print("  Perspective: educational, philosophical, economic, social")
+    print("  Research:    historical, scientific, sonnet")
+    print()
+    print("📋 Commands:")
+    print()
+    print("  ask <question>              - Ask Gemini a question")
+    print("  <persona> <content>         - Validate with persona (e.g., fact <claim>)")
+    print("  all <content>               - Run ALL 16 personas on content")
+    print("  clear                       - Clear conversation history")
+    print("  exit                        - Exit to terminal")
+    print("─" * 54)
+    print()
+
+    current_model = 'flash'
+
+    while True:
+        try:
+            # Custom prompt showing current personality
+            user_input = input(f"🗿 gemini ({current_model}) ❯ ").strip()
+
+            if not user_input:
+                continue
+
+            # Parse commands (no prefix needed)
+            parts = user_input.split(maxsplit=1)
+            cmd = parts[0].lower()
+
+            if cmd == 'exit' or cmd == 'quit':
+                print()
+                print("👋 Exiting Gemini Validator")
+                print()
+                break
+
+            elif cmd == 'clear':
+                if HISTORY_FILE.exists():
+                    HISTORY_FILE.unlink()
+                    print("✅ Conversation history cleared")
+                continue
+
+            elif cmd == 'ask' or cmd == 'chat':
+                if len(parts) < 2:
+                    print("Usage: ask <your question>")
+                    continue
+                prompt = parts[1]
+
+            # All 16 personas
+            elif cmd in ['fact', 'code', 'logic', 'ambiguity', 'optimize',
+                        'practical', 'critical', 'strategic', 'security',
+                        'educational', 'philosophical', 'economic', 'social',
+                        'historical', 'scientific', 'sonnet']:
+                if len(parts) < 2:
+                    print(f"Usage: {cmd} <content>")
+                    continue
+                # Quick validation
+                print()
+                print(f"🔍 Validating ({cmd})...")
+                import subprocess
+                result = subprocess.run(
+                    ['gemini-validate', cmd, parts[1]],
+                    capture_output=True,
+                    text=True
+                )
+                print(result.stdout)
+                continue
+
+            elif cmd == 'all':
+                # Run all 16 personas
+                if len(parts) < 2:
+                    print("Usage: all <content to validate>")
+                    continue
+
+                personas = ['practical', 'critical', 'strategic', 'security',
+                           'educational', 'philosophical', 'economic', 'social',
+                           'historical', 'scientific', 'fact', 'code', 'logic',
+                           'ambiguity', 'optimize', 'sonnet']
+
+                print()
+                print("╔════════════════════════════════════════════════════╗")
+                print("║  🎭 16-PERSONA COMPREHENSIVE ANALYSIS              ║")
+                print("╚════════════════════════════════════════════════════╝")
+                print()
+
+                import subprocess
+                for i, persona in enumerate(personas, 1):
+                    print(f"[{i}/16] {persona.upper()}...")
+                    result = subprocess.run(
+                        ['gemini-validate', persona, parts[1]],
+                        capture_output=True,
+                        text=True
+                    )
+                    print(result.stdout)
+                    print()
+
+                print("─" * 54)
+                print("✅ 16-Persona Analysis Complete")
+                print()
+                continue
+
+            elif cmd in ['flash', 'pro', 'lite', '2.5']:
+                current_model = cmd
+                print(f"✅ Switched to {current_model.upper()} model")
+                continue
+
+            elif cmd == 'ask' or len(parts) > 0:
+                # Treat as direct chat message
+                prompt = user_input
+            else:
+                continue
+
+            # Call Gemini with current model
+            print()
+            print("╔════════════════════════════════════════════════════╗")
+            print(f"║  🤖 {current_model.upper():<46}║")
+            print("╚════════════════════════════════════════════════════╝")
+            print()
+
+            response = call_gemini(prompt, current_model, 0.7, False)
+            print(response)
+            print()
+            print("─" * 54)
+            print()
+
+        except KeyboardInterrupt:
+            print()
+            print()
+            print("👋 Exiting Gemini Validator (Ctrl+C)")
+            print()
+            break
+        except EOFError:
+            print()
+            print()
+            print("👋 Exiting Gemini Validator (EOF)")
+            print()
+            break
+
 def main():
     import argparse
 
@@ -145,18 +297,8 @@ def main():
         return
 
     if not args.prompt:
-        # ASCII banner for help
-        print("╔════════════════════════════════════════════════════╗")
-        print("║          🤖 GEMINI CLI - Quick Chat                ║")
-        print("╚════════════════════════════════════════════════════╝")
-        print()
-        print("Usage:")
-        print("  gemini 'Your question here'")
-        print("  gemini -m pro 'Use Pro model'")
-        print("  gemini -c 'Continue conversation'")
-        print("  gemini --clear  # Clear history")
-        print()
-        print("Models: flash (default), lite, pro, 2.5")
+        # Start interactive mode
+        interactive_mode()
         return
 
     prompt = ' '.join(args.prompt)
