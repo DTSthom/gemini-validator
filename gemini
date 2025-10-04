@@ -128,7 +128,7 @@ def interactive_mode():
     # Monolith ASCII branding
     print()
     print("╔════════════════════════════════════════════════════╗")
-    print("║  🗿 MONOLITH GEMINI VALIDATOR                      ║")
+    print("║  🗿 MONOLITH GEMINI VALIDATOR                     ║")
     print("║     Creator/Validator Architecture                ║")
     print("╚════════════════════════════════════════════════════╝")
     print()
@@ -329,7 +329,7 @@ def interactive_mode():
             # Call Gemini with current model
             print()
             print("╔════════════════════════════════════════════════════╗")
-            print(f"║  🤖 {current_model.upper():<46}║")
+            print(f"║  🤖 {current_model.upper():<45}║")
             print("╚════════════════════════════════════════════════════╝")
             print()
 
@@ -384,7 +384,7 @@ def main():
     # ASCII header
     print()
     print("╔════════════════════════════════════════════════════╗")
-    print(f"║  🤖 Gemini {args.model.upper():<20}", end="")
+    print(f"║  🤖 Gemini {args.model.upper():<19}", end="")
     if args.continue_chat:
         print("(continuing)        ║")
     else:
