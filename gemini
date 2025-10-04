@@ -128,7 +128,7 @@ def interactive_mode():
     # Monolith ASCII branding
     print()
     print("╔════════════════════════════════════════════════════╗")
-    print("║     🗿 MONOLITH GEMINI VALIDATOR                   ║")
+    print("║  🗿 MONOLITH GEMINI VALIDATOR                      ║")
     print("║     Creator/Validator Architecture                ║")
     print("╚════════════════════════════════════════════════════╝")
     print()
@@ -144,11 +144,14 @@ def interactive_mode():
     print()
     print("📋 Commands:")
     print()
-    print("  ask <question>              - Ask Gemini a question")
     print("  <persona> <content>         - Validate with persona (e.g., fact <claim>)")
     print("  all <content>               - Run ALL 16 personas on content")
+    print("  persona <name>              - Show exact prompt for a persona")
+    print("  guide                       - Show full guide")
     print("  clear                       - Clear conversation history")
     print("  exit                        - Exit to terminal")
+    print()
+    print("💡 Tip: Just type your message directly (no command needed)")
     print("─" * 54)
     print()
 
@@ -172,17 +175,87 @@ def interactive_mode():
                 print()
                 break
 
+            elif cmd == 'guide' or cmd == 'help':
+                # Show the full guide
+                print()
+                print("╔════════════════════════════════════════════════════╗")
+                print("║  📖 GEMINI VALIDATOR GUIDE                         ║")
+                print("╚════════════════════════════════════════════════════╝")
+                print()
+                print("🤖 Models (switch anytime):")
+                print("  flash, pro, lite, 2.5")
+                print()
+                print("🎭 16-Persona Validation:")
+                print()
+                print("  Core:        fact, code, logic, ambiguity, optimize")
+                print("  Analysis:    practical, critical, strategic, security")
+                print("  Perspective: educational, philosophical, economic, social")
+                print("  Research:    historical, scientific, sonnet")
+                print()
+                print("📋 Commands:")
+                print()
+                print("  <persona> <content>         - Validate with persona (e.g., fact <claim>)")
+                print("  all <content>               - Run ALL 16 personas on content")
+                print("  persona <name>              - Show exact prompt for a persona")
+                print("  guide                       - Show this guide")
+                print("  clear                       - Clear conversation history")
+                print("  exit                        - Exit to terminal")
+                print()
+                print("💡 Tip: Just type your message directly (no command needed)")
+                print("─" * 54)
+                print()
+                continue
+
             elif cmd == 'clear':
                 if HISTORY_FILE.exists():
                     HISTORY_FILE.unlink()
                     print("✅ Conversation history cleared")
                 continue
 
-            elif cmd == 'ask' or cmd == 'chat':
+            elif cmd == 'persona':
                 if len(parts) < 2:
-                    print("Usage: ask <your question>")
+                    print("Usage: persona <name>")
+                    print("Available: fact, code, logic, ambiguity, optimize,")
+                    print("           practical, critical, strategic, security,")
+                    print("           educational, philosophical, economic, social,")
+                    print("           historical, scientific, sonnet")
                     continue
-                prompt = parts[1]
+
+                # Show the exact prompt from gemini-validate
+                import subprocess
+                result = subprocess.run(
+                    ['grep', '-A', '20', f"'{parts[1]}':", '/home/thommy/projects/gemini-validator/gemini-validate'],
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode == 0 and result.stdout:
+                    print()
+                    print(f"╔════════════════════════════════════════════════════╗")
+                    print(f"║  📋 PERSONA: {parts[1].upper():<38}║")
+                    print(f"╚════════════════════════════════════════════════════╝")
+                    print()
+                    # Extract just the prompt text
+                    lines = result.stdout.split('\n')
+                    in_prompt = False
+                    prompt_lines = []
+                    for line in lines:
+                        if '"""' in line:
+                            if in_prompt:
+                                break
+                            in_prompt = True
+                            continue
+                        if in_prompt:
+                            prompt_lines.append(line)
+
+                    print('\n'.join(prompt_lines))
+                    print()
+                    print("─" * 54)
+                    print(f"💡 Edit in: /home/thommy/projects/gemini-validator/gemini-validate")
+                    print()
+                else:
+                    print(f"❌ Persona '{parts[1]}' not found")
+                continue
 
             # All 16 personas
             elif cmd in ['fact', 'code', 'logic', 'ambiguity', 'optimize',
@@ -242,11 +315,16 @@ def interactive_mode():
                 print(f"✅ Switched to {current_model.upper()} model")
                 continue
 
-            elif cmd == 'ask' or len(parts) > 0:
-                # Treat as direct chat message
-                prompt = user_input
             else:
-                continue
+                # Treat as direct chat message (but warn about limitations)
+                prompt = user_input
+
+                # Warn if asking about current events
+                if any(keyword in user_input.lower() for keyword in ['today', 'score', 'news', 'latest', 'current', 'now', 'yesterday']):
+                    print()
+                    print("⚠️  Warning: Gemini doesn't have real-time data")
+                    print("   Use web search for current events/scores")
+                    print()
 
             # Call Gemini with current model
             print()
