@@ -145,25 +145,41 @@ def main():
         return
 
     if not args.prompt:
-        print("Usage: gemini 'Your question here'")
-        print("       gemini -m pro 'Use Pro model'")
-        print("       gemini -c 'Continue conversation'")
-        print("       gemini --clear  # Clear history")
+        # ASCII banner for help
+        print("╔════════════════════════════════════════════════════╗")
+        print("║          🤖 GEMINI CLI - Quick Chat                ║")
+        print("╚════════════════════════════════════════════════════╝")
+        print()
+        print("Usage:")
+        print("  gemini 'Your question here'")
+        print("  gemini -m pro 'Use Pro model'")
+        print("  gemini -c 'Continue conversation'")
+        print("  gemini --clear  # Clear history")
+        print()
+        print("Models: flash (default), lite, pro, 2.5")
         return
 
     prompt = ' '.join(args.prompt)
 
-    print(f"🤖 Gemini {args.model.upper()}", end="")
+    # ASCII header
+    print()
+    print("╔════════════════════════════════════════════════════╗")
+    print(f"║  🤖 Gemini {args.model.upper():<20}", end="")
     if args.continue_chat:
-        print(" (continuing)", end="")
-    print("\n" + "=" * 50)
+        print("(continuing)        ║")
+    else:
+        print("                    ║")
+    print("╚════════════════════════════════════════════════════╝")
+    print()
 
     response = call_gemini(prompt, args.model, args.temperature, args.continue_chat)
     print(response)
+    print()
 
     if 'Error' not in response:
-        print("\n" + "=" * 50)
-        print("💡 Use 'gemini -c \"follow up\"' to continue this conversation")
+        print("─" * 54)
+        print("💡 Use 'gemini -c \"follow up\"' to continue this chat")
+        print()
 
 if __name__ == '__main__':
     main()

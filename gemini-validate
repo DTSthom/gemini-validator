@@ -654,18 +654,28 @@ def main():
     args = parser.parse_args()
 
     if args.type == 'stats':
+        # ASCII stats header
+        print()
+        print("╔════════════════════════════════════════════════════╗")
+        print("║         📊 VALIDATION STATISTICS                   ║")
+        print("╚════════════════════════════════════════════════════╝")
+        print()
         show_stats()
         return
 
     if not args.content:
         # Read from stdin if no content provided
-        print("Reading from stdin (Ctrl+D when done)...")
+        print("📥 Reading from stdin (Ctrl+D when done)...")
         content = sys.stdin.read()
     else:
         content = ' '.join(args.content)
 
-    print(f"🤖 Gemini Validation: {args.type.upper()}")
-    print("=" * 50)
+    # ASCII validation header
+    print()
+    print("╔════════════════════════════════════════════════════╗")
+    print(f"║  🔍 Validation: {args.type.upper():<32} ║")
+    print("╚════════════════════════════════════════════════════╝")
+    print()
 
     response = validate(
         args.type,
@@ -679,7 +689,8 @@ def main():
     )
 
     print(response)
-    print("=" * 50)
+    print()
+    print("─" * 54)
 
     # Show verdict prominently for fact checks
     if args.type == 'fact' and 'VERDICT:' in response:
